@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComfyUI 许可证管理</title>
+    <link rel="stylesheet" href="/license_static/style.css">
+    <!-- 引入图标库 -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+</head>
+<body>
+    <!-- 背景装饰 -->
+    <div class="bg-decoration">
+        <div class="bg-circle circle-1"></div>
+        <div class="bg-circle circle-2"></div>
+        <div class="bg-circle circle-3"></div>
+    </div>
+
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <div class="logo">
+                <i class="ri-shield-check-line"></i>
+            </div>
+            <h1>ComfyUI 许可证管理</h1>
+            <p>管理您的许可证密钥，享受专业AI服务</p>
+        </div>
+        
+        <!-- 当前卡密状态 -->
+        <div class="section current-license-section">
+            <div class="section-header">
+                <h3><i class="ri-vip-crown-line"></i>当前授权</h3>
+                <div class="license-status" id="licenseStatus">
+                    <span class="status-indicator" id="statusIndicator"></span>
+                    <span id="statusText">未激活</span>
+                </div>
+            </div>
+            
+            <div class="license-card" id="licenseCard">
+                <div class="license-info">
+                    <div class="info-row">
+                        <label>卡密:</label>
+                        <div class="license-key-display">
+                            <input type="text" id="currentLicense" readonly placeholder="暂无有效卡密">
+                            <button class="copy-btn" onclick="copyLicense()" title="复制卡密">
+                                <i class="ri-file-copy-line"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="license-details" id="licenseDetails" style="display: none;">
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <i class="ri-user-line"></i>
+                                <span class="label">用户ID</span>
+                                <span class="value" id="userIdDisplay">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <i class="ri-time-line"></i>
+                                <span class="label">剩余天数</span>
+                                <span class="value" id="daysDisplay">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <i class="ri-refresh-line"></i>
+                                <span class="label">剩余次数</span>
+                                <span class="value" id="usageDisplay">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <i class="ri-star-line"></i>
+                                <span class="label">授权功能</span>
+                                <span class="value" id="featuresDisplay">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="license-actions">
+                    <button class="btn btn-outline" onclick="refreshLicenseInfo()">
+                        <i class="ri-refresh-line"></i>刷新信息
+                    </button>
+                    <button class="btn btn-danger" onclick="clearLicense()">
+                        <i class="ri-delete-bin-line"></i>清除卡密
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 验证新卡密 -->
+        <div class="section verify-section">
+            <div class="section-header">
+                <h3><i class="ri-key-line"></i>验证卡密</h3>
+                <div class="help-tip" title="输入新的卡密进行验证和激活">
+                    <i class="ri-question-line"></i>
+                </div>
+            </div>
+            
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <i class="ri-key-2-line input-icon"></i>
+                    <input 
+                        type="text" 
+                        id="newLicense" 
+                        placeholder="请输入您的授权卡密..." 
+                        maxlength="200"
+                        autocomplete="off"
+                    >
+                    <div class="input-actions">
+                        <button class="paste-btn" onclick="pasteFromClipboard()" title="从剪贴板粘贴">
+                            <i class="ri-clipboard-line"></i>
+                        </button>
+                        <button class="clear-input-btn" onclick="clearInput()" title="清空输入">
+                            <i class="ri-close-line"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="input-hint" id="inputHint">支持各种格式的卡密，请确保输入完整</div>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="validateLicense()">
+                    <i class="ri-shield-check-line"></i>
+                    <span>验证卡密</span>
+                    <div class="btn-loading" style="display: none;">
+                        <i class="ri-loader-line loading-spin"></i>
+                    </div>
+                </button>
+                <button class="btn btn-outline" onclick="checkLicenseInfo()">
+                    <i class="ri-search-line"></i>查询信息
+                </button>
+            </div>
+        </div>
+        
+        <!-- 快速操作 -->
+        <div class="section quick-actions-section">
+            <div class="section-header">
+                <h3><i class="ri-dashboard-line"></i>快速操作</h3>
+            </div>
+            
+            <div class="action-grid">
+                <div class="action-card" onclick="getLicenseStats()">
+                    <div class="action-icon">
+                        <i class="ri-bar-chart-line"></i>
+                    </div>
+                    <div class="action-content">
+                        <h4>统计信息</h4>
+                        <p>查看系统使用统计</p>
+                    </div>
+                </div>
+                
+                <div class="action-card" onclick="testConnection()">
+                    <div class="action-icon">
+                        <i class="ri-wifi-line"></i>
+                    </div>
+                    <div class="action-content">
+                        <h4>连接测试</h4>
+                        <p>测试服务器连接</p>
+                    </div>
+                </div>
+                
+                <div class="action-card" onclick="exportLogs()">
+                    <div class="action-icon">
+                        <i class="ri-download-line"></i>
+                    </div>
+                    <div class="action-content">
+                        <h4>导出日志</h4>
+                        <p>下载使用记录</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 统计信息展示 -->
+        <div class="section stats-section" id="statsSection" style="display: none;">
+            <div class="section-header">
+                <h3><i class="ri-pie-chart-line"></i>使用统计</h3>
+                <button class="close-btn" onclick="hideStats()">
+                    <i class="ri-close-line"></i>
+                </button>
+            </div>
+            <div id="statsResult"></div>
+        </div>
+        
+        <!-- 联系购买 -->
+        <div class="section contact-section">
+            <div class="section-header">
+                <h3><i class="ri-customer-service-line"></i>购买卡密 / 联系我们</h3>
+            </div>
+            <p class="contact-description">需要购买卡密或遇到问题？请通过以下方式联系我们</p>
+            
+            <div class="contact-grid">
+                <div class="contact-card" onclick="copyContact('qq')">
+                    <div class="contact-icon qq">
+                        <i class="ri-qq-line"></i>
+                    </div>
+                    <div class="contact-info">
+                        <div class="contact-label">QQ</div>
+                        <div class="contact-value" id="qqValue">123456789</div>
+                    </div>
+                    <div class="contact-action">
+                        <i class="ri-file-copy-line"></i>
+                    </div>
+                </div>
+                
+                <div class="contact-card" onclick="copyContact('wechat')">
+                    <div class="contact-icon wechat">
+                        <i class="ri-wechat-line"></i>
+                    </div>
+                    <div class="contact-info">
+                        <div class="contact-label">微信</div>
+                        <div class="contact-value" id="wechatValue">your_wechat_id</div>
+                    </div>
+                    <div class="contact-action">
+                        <i class="ri-file-copy-line"></i>
+                    </div>
+                </div>
+                
+                <div class="contact-card" onclick="copyContact('email')">
+                    <div class="contact-icon email">
+                        <i class="ri-mail-line"></i>
+                    </div>
+                    <div class="contact-info">
+                        <div class="contact-label">邮箱</div>
+                        <div class="contact-value" id="emailValue">support@example.com</div>
+                    </div>
+                    <div class="contact-action">
+                        <i class="ri-file-copy-line"></i>
+                    </div>
+                </div>
+                
+                <div class="contact-card" onclick="openWebsite()">
+                    <div class="contact-icon website">
+                        <i class="ri-global-line"></i>
+                    </div>
+                    <div class="contact-info">
+                        <div class="contact-label">官网</div>
+                        <div class="contact-value" id="websiteValue">www.example.com</div>
+                    </div>
+                    <div class="contact-action">
+                        <i class="ri-external-link-line"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 状态消息 -->
+        <div id="status" class="status-message"></div>
+        
+        <!-- Toast 通知 -->
+        <div id="toast" class="toast">
+            <div class="toast-content">
+                <div class="toast-icon">
+                    <i class="ri-check-line"></i>
+                </div>
+                <div class="toast-text"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let currentLicenseInfo = null;
+        let isValidating = false;
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializePage();
+            loadCurrentLicense();
+            setupEventListeners();
+        });
+
+        // 初始化页面
+        function initializePage() {
+            // 添加页面加载动画
+            document.body.classList.add('loaded');
+            
+            // 设置随机背景圆圈动画
+            animateBackgroundCircles();
+        }
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 回车键验证
+            document.getElementById('newLicense').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !isValidating) {
+                    validateLicense();
+                }
+            });
+
+            // 输入框变化监听
+            document.getElementById('newLicense').addEventListener('input', function(e) {
+                const value = e.target.value.trim();
+                const hint = document.getElementById('inputHint');
+                
+                if (value.length === 0) {
+                    hint.textContent = '支持各种格式的卡密，请确保输入完整';
+                    hint.className = 'input-hint';
+                } else if (value.length < 10) {
+                    hint.textContent = '卡密长度似乎过短，请检查是否完整';
+                    hint.className = 'input-hint warning';
+                } else {
+                    hint.textContent = '卡密格式正确，可以进行验证';
+                    hint.className = 'input-hint success';
+                }
+            });
+        }
+
+        // 背景圆圈动画
+        function animateBackgroundCircles() {
+            const circles = document.querySelectorAll('.bg-circle');
+            circles.forEach((circle, index) => {
+                circle.style.animationDelay = `${index * 0.5}s`;
+            });
+        }
+
+        // 加载当前卡密
+        function loadCurrentLicense() {
+            const currentKey = localStorage.getItem('comfyui_license_key');
+            if (currentKey) {
+                document.getElementById('currentLicense').value = currentKey;
+                updateLicenseStatus('active');
+                // 自动获取卡密信息
+                setTimeout(() => {
+                    checkLicenseInfo(currentKey, true);
+                }, 500);
+            } else {
+                updateLicenseStatus('inactive');
+            }
+        }
+
+        // 更新许可证状态
+        function updateLicenseStatus(status, info = null) {
+            const statusIndicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            const licenseDetails = document.getElementById('licenseDetails');
+
+            switch (status) {
+                case 'active':
+                    statusIndicator.className = 'status-indicator active';
+                    statusText.textContent = '已激活';
+                    break;
+                case 'expired':
+                    statusIndicator.className = 'status-indicator expired';
+                    statusText.textContent = '已过期';
+                    break;
+                case 'inactive':
+                default:
+                    statusIndicator.className = 'status-indicator inactive';
+                    statusText.textContent = '未激活';
+                    break;
+            }
+
+            if (info) {
+                updateLicenseDetails(info);
+                licenseDetails.style.display = 'block';
+            } else {
+                licenseDetails.style.display = 'none';
+            }
+        }
+
+        // 更新许可证详情
+        function updateLicenseDetails(info) {
+            document.getElementById('userIdDisplay').textContent = info.user_id || '-';
+            document.getElementById('daysDisplay').textContent = 
+                info.days_remaining === -1 ? '永久' : `${info.days_remaining}天`;
+            document.getElementById('usageDisplay').textContent = 
+                info.usage_remaining === -1 ? '无限制' : `${info.usage_remaining}次`;
+            document.getElementById('featuresDisplay').textContent = 
+                Array.isArray(info.features) ? info.features.join(', ') : (info.features || '-');
+        }
+
+        // 显示消息
+        function showMessage(message, type = 'info', duration = 5000) {
+            const status = document.getElementById('status');
+            const icon = getMessageIcon(type);
+            
+            status.innerHTML = `
+                <div class="message-content">
+                    <i class="${icon}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            status.className = `status-message ${type} show`;
+            
+            setTimeout(() => {
+                status.classList.remove('show');
+            }, duration);
+        }
+
+        // 显示 Toast 通知
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = toast.querySelector('.toast-icon i');
+            const text = toast.querySelector('.toast-text');
+            
+            icon.className = getMessageIcon(type);
+            text.textContent = message;
+            toast.className = `toast ${type} show`;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // 获取消息图标
+        function getMessageIcon(type) {
+            const icons = {
+                success: 'ri-check-line',
+                error: 'ri-error-warning-line',
+                warning: 'ri-alert-line',
+                info: 'ri-information-line'
+            };
+            return icons[type] || icons.info;
+        }
+
+        // 设置按钮加载状态
+        function setButtonLoading(button, loading) {
+            const text = button.querySelector('span');
+            const loader = button.querySelector('.btn-loading');
+            
+            if (loading) {
+                button.disabled = true;
+                if (text) text.style.opacity = '0';
+                if (loader) loader.style.display = 'block';
+            } else {
+                button.disabled = false;
+                if (text) text.style.opacity = '1';
+                if (loader) loader.style.display = 'none';
+            }
+        }
+
+        // 验证卡密
+        async function validateLicense() {
+            if (isValidating) return;
+            
+            const key = document.getElementById('newLicense').value.trim();
+            if (!key) {
+                showMessage('请输入卡密', 'warning');
+                return;
+            }
+            
+            isValidating = true;
+            const validateBtn = document.querySelector('.btn-primary');
+            setButtonLoading(validateBtn, true);
+            
+            showMessage('正在验证卡密...', 'info');
+            
+            try {
+                const response = await fetch('/license/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ license_key: key })
+                });
+                
+                const result = await response.json();
+                
+                if (result.valid) {
+                    localStorage.setItem('comfyui_license_key', key);
+                    document.getElementById('currentLicense').value = key;
+                    document.getElementById('newLicense').value = '';
+                    
+                    currentLicenseInfo = result.license_info;
+                    updateLicenseStatus('active', currentLicenseInfo);
+                    
+                    showToast('卡密验证成功！', 'success');
+                    showMessage('🎉 卡密验证成功！授权已激活', 'success');
+                } else {
+                    showMessage('❌ ' + (result.message || '卡密验证失败'), 'error');
+                }
+            } catch (error) {
+                showMessage('❌ 验证请求失败: ' + error.message, 'error');
+            } finally {
+                isValidating = false;
+                setButtonLoading(validateBtn, false);
+            }
+        }
+
+        // 查询卡密信息
+        async function checkLicenseInfo(customKey = null, silent = false) {
+            const key = customKey || 
+                       document.getElementById('newLicense').value.trim() || 
+                       document.getElementById('currentLicense').value.trim();
+            
+            if (!key) {
+                if (!silent) showMessage('请输入要查询的卡密', 'warning');
+                return;
+            }
+            
+            if (!silent) showMessage('正在查询卡密信息...', 'info');
+            
+            try {
+                const response = await fetch('/license/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ license_key: key })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.user_id) {
+                    currentLicenseInfo = result;
+                    updateLicenseDetails(result);
+                    document.getElementById('licenseDetails').style.display = 'block';
+                    
+                    if (!silent) {
+                        showToast('信息查询成功', 'success');
+                    }
+                } else {
+                    if (!silent) {
+                        showMessage('❌ ' + (result.error || '查询失败'), 'error');
+                    }
+                }
+            } catch (error) {
+                if (!silent) {
+                    showMessage('❌ 查询请求失败: ' + error.message, 'error');
+                }
+            }
+        }
+
+        // 刷新许可证信息
+        function refreshLicenseInfo() {
+            const currentKey = document.getElementById('currentLicense').value.trim();
+            if (currentKey) {
+                checkLicenseInfo(currentKey);
+            } else {
+                showMessage('没有可刷新的卡密', 'warning');
+            }
+        }
+
+        // 获取统计信息
+        async function getLicenseStats() {
+            showMessage('正在获取统计信息...', 'info');
+            
+            try {
+                const response = await fetch('/license/stats');
+                const result = await response.json();
+                
+                if (response.ok) {
+                    displayStats(result);
+                    document.getElementById('statsSection').style.display = 'block';
+                    document.getElementById('statsSection').scrollIntoView({ behavior: 'smooth' });
+                    showToast('统计信息获取成功', 'success');
+                } else {
+                    showMessage('❌ 获取统计信息失败', 'error');
+                }
+            } catch (error) {
+                showMessage('❌ 请求失败: ' + error.message, 'error');
+            }
+        }
+
+        // 显示统计信息
+        function displayStats(stats) {
+            const statsDiv = document.getElementById('statsResult');
+            statsDiv.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="ri-pie-chart-line"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-value">${stats.total_validations || 0}</div>
+                            <div class="stat-label">总验证次数</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon success"><i class="ri-check-line"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-value">${stats.successful_validations || 0}</div>
+                            <div class="stat-label">成功验证</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon error"><i class="ri-close-line"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-value">${stats.failed_validations || 0}</div>
+                            <div class="stat-label">失败验证</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="ri-user-line"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-value">${stats.active_licenses || 0}</div>
+                            <div class="stat-label">活跃卡密</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 隐藏统计信息
+        function hideStats() {
+            document.getElementById('statsSection').style.display = 'none';
+        }
+
+        // 测试连接
+        async function testConnection() {
+            showMessage('正在测试连接...', 'info');
+            
+            try {
+                const startTime = Date.now();
+                const response = await fetch('/license/stats');
+                const endTime = Date.now();
+                const latency = endTime - startTime;
+                
+                if (response.ok) {
+                    showToast(`连接正常 (${latency}ms)`, 'success');
+                } else {
+                    showMessage('连接测试失败', 'error');
+                }
+            } catch (error) {
+                showMessage('❌ 连接失败: ' + error.message, 'error');
+            }
+        }
+
+        // 导出日志
+        function exportLogs() {
+            showToast('日志导出功能开发中...', 'info');
+        }
+
+        // 清除卡密
+        function clearLicense() {
+            if (confirm('确定要清除当前卡密吗？清除后需要重新验证才能使用ComfyUI。')) {
+                localStorage.removeItem('comfyui_license_key');
+                document.getElementById('currentLicense').value = '';
+                updateLicenseStatus('inactive');
+                currentLicenseInfo = null;
+                showToast('卡密已清除', 'success');
+            }
+        }
+
+        // 复制卡密
+        async function copyLicense() {
+            const license = document.getElementById('currentLicense').value;
+            if (!license) {
+                showMessage('没有可复制的卡密', 'warning');
+                return;
+            }
+            
+            try {
+                await navigator.clipboard.writeText(license);
+                showToast('卡密已复制到剪贴板', 'success');
+            } catch (error) {
+                // 降级方案
+                const textArea = document.createElement('textarea');
+                textArea.value = license;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showToast('卡密已复制到剪贴板', 'success');
+            }
+        }
+
+        // 从剪贴板粘贴
+        async function pasteFromClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text.trim()) {
+                    document.getElementById('newLicense').value = text.trim();
+                    showToast('已从剪贴板粘贴', 'success');
+                    // 触发输入事件以更新提示
+                    document.getElementById('newLicense').dispatchEvent(new Event('input'));
+                }
+            } catch (error) {
+                showMessage('剪贴板访问失败，请手动粘贴', 'warning');
+            }
+        }
+
+        // 清空输入
+        function clearInput() {
+            document.getElementById('newLicense').value = '';
+            document.getElementById('inputHint').textContent = '支持各种格式的卡密，请确保输入完整';
+            document.getElementById('inputHint').className = 'input-hint';
+        }
+
+        // 复制联系方式
+        async function copyContact(type) {
+            const values = {
+                qq: document.getElementById('qqValue').textContent,
+                wechat: document.getElementById('wechatValue').textContent,
+                email: document.getElementById('emailValue').textContent
+            };
+            
+            const value = values[type];
+            if (!value) return;
+            
+            try {
+                await navigator.clipboard.writeText(value);
+                showToast(`${type.toUpperCase()}已复制到剪贴板`, 'success');
+            } catch (error) {
+                showMessage('复制失败，请手动复制', 'warning');
+            }
+        }
+
+        // 打开官网
+        function openWebsite() {
+            const website = document.getElementById('websiteValue').textContent;
+            if (website && website !== 'www.example.com') {
+                window.open(`https://${website}`, '_blank');
+            } else {
+                showToast('官网地址待配置', 'info');
+            }
+        }
+    </script>
+</body>
+</html> 
