@@ -1,5 +1,5 @@
 """
-ComfyUI License Manager Web API模块
+ComfyUI License Manager Web API模块 - 完整版本
 """
 
 import json
@@ -12,17 +12,15 @@ except ImportError:
     from license_manager import license_validator
 
 def setup_license_routes(app):
-    """设置许可证相关的所有路由"""
-    
-    # 获取当前文件夹路径
+    """设置许可证相关的路由"""
     current_dir = os.path.dirname(__file__)
     static_dir = os.path.join(current_dir, "static")
     
-    # 确保静态文件目录存在
+    # 确保目录存在
     if not os.path.exists(static_dir):
         os.makedirs(static_dir)
     
-    # 创建所有静态文件（如果不存在）
+    # 创建静态文件
     create_static_files()
     
     # 主页卡密验证脚本注入路由
@@ -36,6 +34,8 @@ def setup_license_routes(app):
             
             response = web.Response(text=content, content_type='application/javascript')
             response.headers['Cache-Control'] = 'no-cache'
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
             return response
         else:
             return web.Response(status=404)
@@ -51,6 +51,8 @@ def setup_license_routes(app):
             
             response = web.Response(text=content, content_type='text/html')
             response.headers['Cache-Control'] = 'no-cache'
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
             return response
         else:
             return web.Response(status=404)
@@ -66,6 +68,8 @@ def setup_license_routes(app):
             
             response = web.Response(text=content, content_type='text/css')
             response.headers['Cache-Control'] = 'no-cache'
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
             return response
         else:
             return web.Response(status=404)
@@ -73,8 +77,11 @@ def setup_license_routes(app):
     # API路由
     async def validate_license_api(request):
         """验证卡密API"""
-        json_data = await request.json()
-        license_key = json_data.get("license_key")
+        try:
+            json_data = await request.json()
+            license_key = json_data.get("license_key", "").strip()
+        except Exception as e:
+            return web.json_response({"error": f"JSON解析失败: {str(e)}"}, status=400)
         
         if not license_key:
             return web.json_response({"error": "卡密不能为空"}, status=400)
@@ -108,8 +115,11 @@ def setup_license_routes(app):
     
     async def check_license_info(request):
         """查询卡密信息"""
-        json_data = await request.json()
-        license_key = json_data.get("license_key")
+        try:
+            json_data = await request.json()
+            license_key = json_data.get("license_key", "").strip()
+        except Exception as e:
+            return web.json_response({"error": f"JSON解析失败: {str(e)}"}, status=400)
         
         if not license_key:
             return web.json_response({"error": "卡密不能为空"}, status=400)
@@ -139,137 +149,154 @@ def create_static_files():
     if not os.path.exists(static_dir):
         os.makedirs(static_dir)
     
-    # 创建JavaScript注入脚本
-    js_content = '''// ComfyUI 卡密验证拦截器
+    # 创建完整的JavaScript注入脚本
+    js_content = create_license_injection_script()
+    
+    js_path = os.path.join(static_dir, "license_injection.js")
+    with open(js_path, 'w', encoding='utf-8') as f:
+        f.write(js_content)
+    
+    # 创建CSS样式文件
+    css_content = create_css_styles()
+    
+    css_path = os.path.join(static_dir, "style.css")
+    with open(css_path, 'w', encoding='utf-8') as f:
+        f.write(css_content)
+    
+    print("[ComfyUI-License-Manager] 静态文件已创建")
+
+def create_license_injection_script():
+    """创建许可证注入脚本"""
+    return '''// ComfyUI 卡密验证拦截器 - 完整版本
 (function() {
     'use strict';
 
     let originalFetch = window.fetch;
-    let licenseKey = localStorage.getItem('comfyui_license_key') || '';
+    let licenseKey = '';  // 不从localStorage读取，每次都需要重新输入
+    let dialogShown = false;
 
-    // 重写fetch函数来拦截prompt请求
+    // 重写fetch函数来拦截所有请求
     window.fetch = function(url, options) {
-        // 检查是否是prompt提交请求
-        if (url.includes('/prompt') && options && options.method === 'POST') {
-            // 如果没有卡密，显示输入对话框
+        console.log('[License] 拦截请求:', url, options?.method);
+        
+        // 检查是否是需要验证的请求
+        const needsLicense = (
+            (url.includes('/prompt') && options?.method === 'POST') ||
+            (url.includes('/queue') && options?.method === 'POST') ||
+            (url.includes('/interrupt') && options?.method === 'POST') ||
+            (url.includes('/api/') && options?.method === 'POST') ||
+            url.includes('/upload/') ||
+            url.includes('/view') ||
+            url.includes('/history')
+        );
+        
+        if (needsLicense) {
+            console.log('[License] 需要验证的请求:', url);
+            
             if (!licenseKey) {
+                console.log('[License] 没有卡密，显示对话框');
                 showLicenseDialog();
-                return Promise.reject(new Error('需要提供有效的卡密才能使用'));
+                return Promise.reject(new Error('🔒 需要提供有效的卡密才能使用ComfyUI'));
             }
 
-            // 在请求中添加license_key
-            if (options.body) {
+            if (options && options.body) {
                 try {
                     const body = JSON.parse(options.body);
                     body.license_key = licenseKey;
                     options.body = JSON.stringify(body);
+                    console.log('[License] 已添加卡密到请求');
                 } catch (e) {
-                    console.error('Error adding license key to request:', e);
+                    console.error('[License] 添加卡密失败:', e);
                 }
+            } else if (options) {
+                options.body = JSON.stringify({ license_key: licenseKey });
+                options.headers = options.headers || {};
+                options.headers['Content-Type'] = 'application/json';
             }
         }
 
         return originalFetch.call(this, url, options);
     };
 
+    // 拦截所有交互事件
+    ['click', 'mousedown', 'keydown', 'submit'].forEach(eventType => {
+        document.addEventListener(eventType, function(e) {
+            if (!licenseKey && !e.target.closest('#licenseDialog')) {
+                if (eventType === 'keydown') {
+                    const allowedKeys = ['Tab', 'F5', 'F12', 'Escape', 'Enter'];
+                    if (allowedKeys.includes(e.key) || e.ctrlKey) return;
+                }
+                
+                console.log('[License] 拦截事件:', eventType);
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                showLicenseDialog();
+                return false;
+            }
+        }, true);
+    });
+
+    // 定期检查保护状态
+    setInterval(function() {
+        if (!licenseKey) {
+            hidePageContent();
+            if (!dialogShown) {
+                showLicenseDialog();
+                dialogShown = true;
+            }
+        }
+    }, 2000);
+
     // 显示卡密输入对话框
     function showLicenseDialog() {
-        // 检查是否已经有对话框
-        if (document.getElementById('licenseDialog')) {
-            return;
+        const existingDialog = document.getElementById('licenseDialog');
+        if (existingDialog) {
+            existingDialog.remove();
         }
+
+        dialogShown = true;
 
         const dialog = document.createElement('div');
         dialog.id = 'licenseDialog';
-        dialog.innerHTML = `
-            <div style="
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.8);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 10000;
-            ">
-                <div style="
-                    background: white;
-                    border-radius: 15px;
-                    padding: 30px;
-                    max-width: 500px;
-                    width: 90%;
-                    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-                ">
-                    <div style="text-align: center; margin-bottom: 25px;">
-                        <div style="font-size: 48px; margin-bottom: 15px;">🔐</div>
-                        <h2 style="margin: 0; color: #333;">需要卡密验证</h2>
-                        <p style="color: #666; margin-top: 10px;">请输入您的授权卡密以继续使用ComfyUI</p>
-                    </div>
-                    
-                    <div style="margin-bottom: 20px;">
-                        <label style="display: block; margin-bottom: 8px; color: #555; font-weight: 600;">卡密:</label>
-                        <input type="text" id="licenseInput" placeholder="请输入您的卡密..." style="
-                            width: 100%;
-                            padding: 15px;
-                            border: 2px solid #e1e1e1;
-                            border-radius: 8px;
-                            font-size: 16px;
-                            box-sizing: border-box;
-                        ">
-                    </div>
-                    
-                    <div style="display: flex; gap: 15px;">
-                        <button id="validateBtn" style="
-                            flex: 1;
-                            padding: 15px 25px;
-                            border: none;
-                            border-radius: 8px;
-                            font-size: 16px;
-                            font-weight: 600;
-                            cursor: pointer;
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                            color: white;
-                        ">验证卡密</button>
-                        <button id="licensePageBtn" style="
-                            flex: 1;
-                            padding: 15px 25px;
-                            border: 2px solid #e9ecef;
-                            border-radius: 8px;
-                            font-size: 16px;
-                            font-weight: 600;
-                            cursor: pointer;
-                            background: #f8f9fa;
-                            color: #6c757d;
-                        ">卡密管理</button>
-                    </div>
-                    
-                    <div id="dialogStatus" style="
-                        margin-top: 15px;
-                        padding: 10px;
-                        border-radius: 5px;
-                        text-align: center;
-                        display: none;
-                    "></div>
-                </div>
-            </div>
-        `;
-
+        dialog.innerHTML = createDialogHTML();
         document.body.appendChild(dialog);
 
-        // 绑定事件
+        setupDialogEvents(dialog);
+    }
+
+    function createDialogHTML() {
+        return \`<div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%); display: flex; align-items: center; justify-content: center; z-index: 999999; backdrop-filter: blur(10px);">
+            <div style="background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%); border-radius: 20px; padding: 40px; max-width: 550px; width: 90%; box-shadow: 0 25px 60px rgba(0,0,0,0.3);">
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <div style="font-size: 64px; margin-bottom: 20px;">🔐</div>
+                    <h2 style="margin: 0; color: #2c3e50; font-size: 28px; font-weight: 700;">ComfyUI 授权验证</h2>
+                    <p style="color: #7f8c8d; margin: 10px 0; font-size: 16px;">请输入您的授权卡密以继续使用<br><span style="color: #e74c3c; font-weight: 600;">每次使用都需要重新验证</span></p>
+                </div>
+                <div style="margin-bottom: 25px;">
+                    <label style="display: block; margin-bottom: 12px; color: #2c3e50; font-weight: 700; font-size: 14px;">🔑 授权卡密</label>
+                    <input type="text" id="licenseInput" placeholder="请输入您的授权卡密..." style="width: 100%; padding: 18px 20px; border: 3px solid #e9ecef; border-radius: 12px; font-size: 16px; font-family: 'Courier New', monospace; box-sizing: border-box;">
+                </div>
+                <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                    <button id="validateBtn" style="flex: 2; padding: 18px 30px; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">🚀 验证卡密</button>
+                    <button id="licensePageBtn" style="flex: 1; padding: 18px 25px; border: 2px solid #e9ecef; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; background: #f8f9fa; color: #6c757d;">📋 管理</button>
+                </div>
+                <div id="dialogStatus" style="margin-top: 20px; padding: 15px 20px; border-radius: 10px; text-align: center; display: none; font-weight: 600; font-size: 14px;"></div>
+                <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e9ecef; text-align: center;">
+                    <p style="color: #95a5a6; font-size: 12px; margin: 0;">🛡️ 安全提示：每次使用都需要重新验证<br>💡 如需帮助，请联系管理员<br>⌨️ 快捷键：按 Enter 键快速验证</p>
+                </div>
+            </div>
+        </div>\`;
+    }
+
+    function setupDialogEvents(dialog) {
         const input = document.getElementById('licenseInput');
         const validateBtn = document.getElementById('validateBtn');
         const licensePageBtn = document.getElementById('licensePageBtn');
         const status = document.getElementById('dialogStatus');
 
-        // 加载保存的卡密
-        if (licenseKey) {
-            input.value = licenseKey;
-        }
+        input.focus();
 
-        // 验证按钮事件
         validateBtn.onclick = async function() {
             const key = input.value.trim();
             if (!key) {
@@ -278,7 +305,9 @@ def create_static_files():
             }
 
             showDialogStatus('正在验证...', 'loading');
-            
+            validateBtn.disabled = true;
+            validateBtn.innerHTML = '⏳ 验证中...';
+
             try {
                 const response = await originalFetch('/license/validate', {
                     method: 'POST',
@@ -287,28 +316,36 @@ def create_static_files():
                 });
 
                 const result = await response.json();
-                
+
                 if (result.valid) {
                     licenseKey = key;
-                    localStorage.setItem('comfyui_license_key', key);
                     showDialogStatus('✅ 验证成功！', 'success');
+                    validateBtn.innerHTML = '🎉 验证成功';
+
                     setTimeout(() => {
-                        document.body.removeChild(dialog);
-                    }, 1500);
+                        showPageContent();
+                        dialog.style.opacity = '0';
+                        setTimeout(() => {
+                            document.body.removeChild(dialog);
+                            dialogShown = false;
+                        }, 500);
+                    }, 2000);
                 } else {
                     showDialogStatus('❌ ' + (result.message || '验证失败'), 'error');
+                    validateBtn.disabled = false;
+                    validateBtn.innerHTML = '🚀 验证卡密';
                 }
             } catch (error) {
                 showDialogStatus('❌ 验证请求失败', 'error');
+                validateBtn.disabled = false;
+                validateBtn.innerHTML = '🚀 验证卡密';
             }
         };
 
-        // 卡密管理页面按钮事件
         licensePageBtn.onclick = function() {
             window.open('/license_dialog.html', '_blank');
         };
 
-        // 回车键验证
         input.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 validateBtn.click();
@@ -318,70 +355,87 @@ def create_static_files():
         function showDialogStatus(message, type) {
             status.textContent = message;
             status.style.display = 'block';
-            status.style.background = type === 'success' ? '#d4edda' : 
-                                     type === 'error' ? '#f8d7da' : '#d1ecf1';
-            status.style.color = type === 'success' ? '#155724' : 
-                                type === 'error' ? '#721c24' : '#0c5460';
-            status.style.border = type === 'success' ? '1px solid #c3e6cb' : 
-                                 type === 'error' ? '1px solid #f5c6cb' : '1px solid #bee5eb';
+
+            if (type === 'success') {
+                status.style.background = 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)';
+                status.style.color = '#155724';
+                status.style.border = '2px solid #27ae60';
+            } else if (type === 'error') {
+                status.style.background = 'linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%)';
+                status.style.color = '#721c24';
+                status.style.border = '2px solid #e74c3c';
+            } else {
+                status.style.background = 'linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%)';
+                status.style.color = '#0c5460';
+                status.style.border = '2px solid #3498db';
+            }
         }
     }
 
-    // 页面加载时检查卡密状态
-    document.addEventListener('DOMContentLoaded', function() {
-        if (licenseKey) {
-            // 验证已保存的卡密
-            originalFetch('/license/check', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ license_key: licenseKey })
-            }).then(response => response.json())
-            .then(result => {
-                if (!result.valid) {
-                    localStorage.removeItem('comfyui_license_key');
-                    licenseKey = '';
-                }
-            }).catch(() => {
-                // 网络错误时保持卡密
-            });
+    // 页面内容控制函数
+    function hidePageContent() {
+        if (!licenseKey) {
+            const body = document.body;
+            if (body && !body.classList.contains('license-hidden')) {
+                body.style.filter = 'blur(5px)';
+                body.style.pointerEvents = 'none';
+                body.style.userSelect = 'none';
+                body.classList.add('license-hidden');
+            }
         }
+    }
 
-        // 添加卡密管理按钮到菜单
-        addLicenseButton();
+    function showPageContent() {
+        const body = document.body;
+        if (body && body.classList.contains('license-hidden')) {
+            body.style.filter = '';
+            body.style.pointerEvents = '';
+            body.style.userSelect = '';
+            body.classList.remove('license-hidden');
+        }
+    }
+
+    // 页面加载时立即显示卡密对话框
+    document.addEventListener('DOMContentLoaded', function() {
+        if (!dialogShown) {
+            showLicenseDialog();
+            dialogShown = true;
+        }
+        hidePageContent();
     });
 
-    // 添加卡密管理按钮
-    function addLicenseButton() {
-        setTimeout(() => {
-            const menuBar = document.querySelector('.comfy-menu') || document.querySelector('#app');
-            if (menuBar && !document.getElementById('licenseMenuBtn')) {
-                const button = document.createElement('button');
-                button.id = 'licenseMenuBtn';
-                button.innerHTML = '🔐 卡密管理';
-                button.style.cssText = `
-                    margin-left: 10px;
-                    padding: 5px 10px;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    border: none;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    font-size: 12px;
-                `;
-                button.onclick = () => window.open('/license_dialog.html', '_blank');
-                menuBar.appendChild(button);
+    // 页面可见性变化时重新验证
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            licenseKey = '';
+            hidePageContent();
+            if (!dialogShown) {
+                setTimeout(() => {
+                    showLicenseDialog();
+                    dialogShown = true;
+                }, 500);
             }
-        }, 2000);
-    }
+        }
+    });
+
+    // 窗口焦点变化时重新验证
+    window.addEventListener('focus', function() {
+        licenseKey = '';
+        hidePageContent();
+        if (!dialogShown) {
+            setTimeout(() => {
+                showLicenseDialog();
+                dialogShown = true;
+            }, 500);
+        }
+    });
 
 })();'''
-    
-    js_path = os.path.join(static_dir, "license_injection.js")
-    with open(js_path, 'w', encoding='utf-8') as f:
-        f.write(js_content)
-    
-    # 创建CSS样式文件
-    css_content = '''* {
+
+def create_css_styles():
+    """创建CSS样式"""
+    return '''/* ComfyUI License Manager 样式 */
+* {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -405,190 +459,7 @@ body {
     width: 100%;
     max-width: 600px;
     margin: 20px;
-}
-
-.header {
-    text-align: center;
-    margin-bottom: 40px;
-}
-
-.header h1 {
-    font-size: 32px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 10px;
-}
-
-.header p {
-    color: #666;
-    font-size: 16px;
-}
-
-.section {
-    margin-bottom: 40px;
-    padding: 30px;
-    background: #f8f9fa;
-    border-radius: 15px;
-    border-left: 5px solid #667eea;
-}
-
-.section h3 {
-    color: #667eea;
-    margin-bottom: 20px;
-    font-size: 20px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.form-group {
-    margin-bottom: 25px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: #555;
-}
-
-.form-group input {
-    width: 100%;
-    padding: 15px;
-    border: 2px solid #e1e1e1;
-    border-radius: 10px;
-    font-size: 16px;
-    transition: all 0.3s ease;
-}
-
-.form-group input:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    padding: 15px 30px;
-    border-radius: 10px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    margin-right: 15px;
-    margin-bottom: 10px;
-}
-
-.btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
-}
-
-.btn-secondary {
-    background: #6c757d;
-}
-
-.btn-danger {
-    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
-}
-
-.status {
-    padding: 15px;
-    border-radius: 10px;
-    margin-top: 20px;
-    font-weight: 500;
-    display: none;
-}
-
-.status.success {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-}
-
-.status.error {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-}
-
-.status.info {
-    background: #d1ecf1;
-    color: #0c5460;
-    border: 1px solid #bee5eb;
-}
-
-.license-info {
-    background: #e3f2fd;
-    padding: 20px;
-    border-radius: 10px;
-    margin-top: 20px;
-}
-
-.license-info h4 {
-    color: #1565c0;
-    margin-bottom: 15px;
-}
-
-.license-info p {
-    margin-bottom: 8px;
-    color: #1976d2;
-}
-
-.contact-section {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-left: none;
-}
-
-.contact-section h3 {
-    color: white;
-}
-
-.contact-links {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
-    margin-top: 20px;
-}
-
-.contact-item {
-    background: rgba(255,255,255,0.1);
-    padding: 20px;
-    border-radius: 10px;
-    text-align: center;
-    transition: all 0.3s ease;
-}
-
-.contact-item:hover {
-    background: rgba(255,255,255,0.2);
-    transform: translateY(-2px);
-}
-
-.contact-item .icon {
-    font-size: 30px;
-    margin-bottom: 10px;
-}
-
-.contact-item .label {
-    font-weight: 600;
-    margin-bottom: 5px;
-}
-
-.contact-item .value {
-    font-size: 14px;
-    opacity: 0.9;
 }'''
-    
-    css_path = os.path.join(static_dir, "style.css")
-    with open(css_path, 'w', encoding='utf-8') as f:
-        f.write(css_content)
-    
-    print("[ComfyUI-License-Manager] 静态文件已创建")
 
 # 在模块加载时创建静态文件
-create_static_files() 
+create_static_files()
